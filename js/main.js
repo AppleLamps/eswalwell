@@ -89,6 +89,23 @@
     updateActiveLink();
   }
 
+  function initSkipLink() {
+    const skipLink = document.querySelector('.skip-link[href^="#"]');
+    if (!skipLink) {
+      return;
+    }
+
+    skipLink.addEventListener('click', () => {
+      const id = skipLink.getAttribute('href')?.slice(1);
+      const target = id ? document.getElementById(id) : null;
+      if (!target || typeof target.focus !== 'function') {
+        return;
+      }
+
+      requestAnimationFrame(() => target.focus());
+    });
+  }
+
   function initSectionJumpFab() {
     const fab = document.querySelector('.section-jump-fab');
     if (!fab) {
@@ -102,6 +119,13 @@
       fab.classList.toggle('open', open);
       if (toggle) {
         toggle.setAttribute('aria-expanded', String(open));
+      }
+      if (menu) {
+        menu.hidden = !open;
+        menu.setAttribute('aria-hidden', String(!open));
+      }
+      if (!open && menu?.contains(document.activeElement)) {
+        toggle?.focus();
       }
     };
 
@@ -128,6 +152,8 @@
         setOpen(false);
       }
     });
+
+    setOpen(false);
   }
 
   function initBackToTop() {
@@ -154,8 +180,17 @@
       return;
     }
 
+    chart.replaceChildren();
     chart.setAttribute('role', 'img');
-    chart.setAttribute('aria-label', 'Daily social interaction chart');
+    chart.setAttribute('aria-describedby', 'social-chart-description');
+
+    const peakDay = socialData.reduce((currentPeak, item) => (
+      item.v > currentPeak.v ? item : currentPeak
+    ), socialData[0]);
+    chart.setAttribute(
+      'aria-label',
+      `Daily social interaction chart from October 2025 through April 2026. Peak engagement was ${peakDay.v} million on ${peakDay.d}.`
+    );
 
     const maxValue = Math.max(...socialData.map((d) => d.v));
 
@@ -172,18 +207,59 @@
         bar.style.background = 'var(--text-tertiary)';
       }
 
-      bar.innerHTML = `<span class="tooltip">${item.d}: ${item.v}M</span>`;
+      const tooltip = document.createElement('span');
+      tooltip.className = 'tooltip';
+      tooltip.setAttribute('aria-hidden', 'true');
+      tooltip.textContent = `${item.d}: ${item.v}M`;
+
+      bar.appendChild(tooltip);
       chart.appendChild(bar);
     });
   }
 
+  function renderSocialDataTable() {
+    const container = document.getElementById('social-chart-data');
+    if (!container) {
+      return;
+    }
+
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    ['Date', 'Interactions'].forEach((label) => {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.textContent = label;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+
+    const tbody = document.createElement('tbody');
+    socialData.forEach((item) => {
+      const row = document.createElement('tr');
+      const date = document.createElement('td');
+      const value = document.createElement('td');
+
+      date.textContent = item.d;
+      value.textContent = `${item.v}M`;
+
+      row.append(date, value);
+      tbody.appendChild(row);
+    });
+
+    table.append(thead, tbody);
+    container.replaceChildren(table);
+  }
+
   function init() {
     bindFilters();
-    wrapTablesForResponsiveOverflow();
+    renderSocialDataTable();
     initScrollSpy();
+    initSkipLink();
     initSectionJumpFab();
     initBackToTop();
     renderSocialChart();
+    wrapTablesForResponsiveOverflow();
   }
 
   window.filterFindings = filterFindings;
